@@ -1,12 +1,10 @@
+#Requires -RunAsAdministrator
+#Requires -Version 3.0
 <#
 .Synopsis:   Script to export Event Logs and Cluster Log to a shared folder
 .Created by: Juliano Alves de Brito Ribeiro (julianoalvesbr@live.com)
 .Version:    0.1
 .Requirements:
-
-#Requires -RunAsAdministrator
-#Requires -Version 3.0
-
 #>
 
 
