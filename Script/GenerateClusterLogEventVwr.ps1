@@ -1,110 +1,195 @@
 #Requires -RunAsAdministrator
-#Requires -Version 3.0
+#Requires -Version 4.0
+
 <#
-.Synopsis:   Script to Eexport Event Logs and Cluster Log to a shared folder
-.Created by: Juliano Alves de Brito Ribeiro (julianoalvesbr@live.com)
-.Version:    0.1
+.Synopsis:   Script to export Event Logs and Cluster Log to a shared folder
+.Created by: Juliano Alves de Brito Ribeiro (julianoalvesbr@live.com or jaribeiro@uoldiveo.com)
+.Version:    0.3
 .Requirements:
+    Have a hidden share named "ClusterLog$". After generate the logs, this script will copy to this. 
+    
+.Improvements:  Get Event Log of all nodes. 
+                Validate Cluster Service
+
 #>
 
-
-# Config
-$logFileList = @()
-$logFileList = "Application","System","Security" # Add Name of the Logfile (System, Application, etc)
-$outputpath = "$Env:SystemDrive\temp\" # Add Path, needs to end with a backsplash
-[string]$PCname = $Env:COMPUTERNAME
-
-
-if (Test-Path $outputpath){
-    Write-Output "Path to save temporary files already exist. Let's continue..."
-}else{
-    Write-Output "Path to save temporary files does not exists. I will create It"
-    New-Item -Path "c:\" -Name "Temp" -ItemType "Directory" -Force -Verbose 
-
-}
-
-Start-Sleep -Seconds 3
-
-Write-Output "Would you like to delete old evtx files in path $outputpath before continue (Default is No)" -ForegroundColor Yellow 
-    $ReadAnswer = Read-Host " ( y / n ) " 
-    Switch ($ReadAnswer) 
-     { 
-       Y {
-       Write-Output "Yes, I will delete now"
-       $Daysback = "-2"
-       $Hoursback = "-12"
-       $CurrentDate = Get-Date
-       #$DatetoDelete = $CurrentDate.AddDays($Daysback)
-       $DatetoDelete = $CurrentDate.AddHours($Hoursback)
-       Get-ChildItem $outputpath | Where-Object { ($_.LastWriteTime -lt $DatetoDelete) -and ($_.Extension -eq ".evtx") } | Remove-Item
-       #Clear-Eventlog -LogName $logFileName
-                  
-       } 
-       N {
-          Write-Output "No, Let's Continue without delete"
-          } 
-       Default {Write-Output "Default, Let's continue without delete"} 
-     } 
-
-
-
-#Export Event Viewer Log Files
-foreach ($logFileName in $logFileList)
+function Confirm-ClusSVCExists($ComputerName,$ServiceName)
+{   
+    if (Get-Service -ComputerName $ComputerName -Name $ServiceName -ErrorAction SilentlyContinue)
     {
-    Write-Output "Generating log: $logFileName ..."
-    Start-Sleep -Seconds 2
-    $exportFileName = $logFileName + "-" + $PCname + (get-date -f yyyyMMdd) + ".evtx"
-    $logFile = Get-WmiObject -Class Win32_NTEventLogFile | Where-Object -FilterScript {$_.logfilename -eq $logFileName}
-    $logFile.backupeventlog($outputpath + $exportFileName)
+        return $true
+    }else
+    {
+    return $false
+    }
+}
+
+
+
+function Export-MCSCLogEventVwr 
+{
+    
+        [CmdletBinding()]
+    Param
+    (
+
+        #Param Cluster Name Help Description
+        [parameter(ValueFromPipeline=$True,
+                   ValueFromPipelineByPropertyName=$True,
+                   Mandatory=$true,
+                   Position=0,
+                   HelpMessage="Nome do Cluster")]
+        [String]$clusterName,        
+
+
+        #Param NodeName Help Description
+        [parameter(ValueFromPipeline=$True,
+                   ValueFromPipelineByPropertyName=$True,
+                   HelpMessage="Name of Node")]
+        [String]$NodeName,
+        
+
+        $tmpOutputPath = "$env:SystemDrive\Temp",
+
+
+        # Param2 help description
+        [parameter(HelpMessage="Cluster Nodes")]
+        $clusterNodes = @(),
+
+        [parameter(Mandatory=$false)]
+        [string]$dataAtual=(Get-date -Format ddMMyyyy).ToString()
+
+  
+       )
+
+$logFileList = "Application","System","Security" # Add Name of the Logfile (System, Application, etc)
+
+#$clusterName = Read-Host -Prompt "Digite o Nome do Cluster que deseja exportar o Cluster Log e o EventViewer"
+
+$clusterNodes = Get-Cluster -Name $clusterName | Get-ClusterNode | Select-Object -ExpandProperty Name
+
+$outputPath = $tmpOutputPath
+
+foreach ($clusterNode in $clusterNodes){
+
+  $SVCExists = Confirm-ClusSVCExists -ServiceName 'ClusSvc' -ComputerName $clusterNode
+
+  if ($SVCExists){
+    
+   Write-Output "Cluster Service is ok on node: $ClusterNode"
+
+}#end of if
+else
+{
+   Write-Output "Cluster Service is not ok on node: $ClusterNode"
+      
+}#end of else
+    
 
 }
 
-#Ask if user wants to delete old cluster logs
-Write-Output "Would you like to delete old ClusterLog files in path $outputpath before continue (Default is No)" -ForegroundColor Yellow 
-    $ReadAnswer = Read-Host " ( y / n ) " 
-    Switch ($ReadAnswer) 
-     { 
-       Y {
-       Write-Output "Yes, I will delete now"
-       $Daysback = "-2"
-       $Hoursback = "-6"
-       $CurrentDate = Get-Date
-       #$DatetoDelete = $CurrentDate.AddDays($Daysback)
-       $DatetoDelete = $CurrentDate.AddHours($Hoursback)
-       Get-ChildItem $outputpath | Where-Object { ($_.LastWriteTime -lt $DatetoDelete) -and ($_.Extension -eq ".log") -and ($_.Name -like "*cluster*")} | Remove-Item
-       #Clear-Eventlog -LogName $logFileName
+#Verificar se o caminho para gravar os logs existe
+if (Test-Path $tmpOutputPath){
+    
+    Write-Output "Path to save temporary files already exist. Let's continue..."
+
+    Set-Location $OutputPath
+
+    $tmpEVTX = Get-ChildItem -file | Where-Object -FilterScript {$_.Extension -like ".evtx"}
+
+    $countEVTX = $tmpEVTX.Length
+
+    if ($countEVTX -gt 0){
+
+        $Hoursback = "-12"
+        $CurrentDate = Get-Date
+        #$DatetoDelete = $CurrentDate.AddDays($Daysback)
+        $DatetoDelete = $CurrentDate.AddHours($Hoursback)
+        Get-ChildItem -File | Where-Object { ($_.LastWriteTime -lt $DatetoDelete) -and ($_.Extension -eq ".evtx") } | Remove-Item
+       
+    }#end of IF
+    
+}#end of if
+else{
+    Write-Output "Path to save temporary files does not exists. I will create It"
+    
+    New-Item -Path "C:\" -Name "Temp" -ItemType "Directory" -Force -Verbose
+    
+    Start-Sleep -Milliseconds 300
+      
+
+}#end of else
+
+
+foreach ($ClusterNode in $clusterNodes){
+
+        $StringNode = $clusterNode.toString()
+                
+#Export Event Viewer Log Files
+    foreach ($logFileName in $logFileList)
+        {
+            Write-Output "Generating the Logs of Node: $StringNode. Log Name: $logFileName ..."
+        
+            Start-Sleep -Milliseconds 300
+        
+            $exportFileName = $logFileName + "-" + $StringNode + "-" + (Get-Date -f ddMMyyyy) + ".evtx"
+        
+            $logFile = Get-WmiObject -ComputerName $StringNode -Class Win32_NTEventLogFile | Where-Object -FilterScript {$_.logfilename -eq $logFileName}
+        
+            $logFile.backupeventlog($outputpath + "\" + $exportFileName)
+                               
+    }#end foreach log
+
+}#end foreach nodes
+
+#COPY EVTX from Nodes to C:\TEMP
+foreach ($ClusterNode in $clusterNodes){
+    
+    $StringNode = $clusterNode.ToString()
+
+    Copy-Item -Path "\\$StringNode\C$\Temp\*.evtx" -Destination $outputPath -Force -Verbose
+        
+}#end FOREACH
+
+
+$Hoursback = "-12"
+$CurrentDate = Get-Date
+#$DatetoDelete = $CurrentDate.AddDays($Daysback)
+$DatetoDelete = $CurrentDate.AddHours($Hoursback)
+Get-ChildItem $outputpath -File | Where-Object { ($_.LastWriteTime -lt $DatetoDelete) -and ($_.Extension -eq ".log") -and ($_.Name -like "*cluster*")} | Remove-Item
                   
-       } 
-       N {
-          Write-Output "No, Let's Continue without delete"
-          } 
-       Default {Write-Output "Default, Let's continue without delete"} 
-     } 
-
-
 #Generate ClusterLog
-Write-Output "I will generate the cluster logs now..."
+Write-Output "I will generate the Cluster Logs of the $ClusterName Now..."
 
-Get-ClusterLog -Destination $outputpath -Verbose
+foreach ($clusterNode in $clusterNodes){
 
-Start-Sleep -Seconds 3 -Verbose
+    $StringNode = $clusterNode.ToString()
+
+    Get-ClusterLog -Node $StringNode -Destination $outputPath -Verbose    
+
+}#End of ForEach
+
 
 
 #Create and Copy Logs to a Shared Folder
+#####INPUT THE NAME OF YOUR SERVER HERE####
+$SharedPC = "serverName"
+$DriveLetter = "U"
+$Path = "ClusterLog"
 
-$SharedPC = "servername"
-$DriveLetter = "C"
-$Path = "clusterlog$"
-New-Item -Path \\$SharedPC\$DriveLetter$\$Path -ItemType Directory -Name $PCname -Force -Verbose
+New-Item -Path \\$SharedPC\$Path$ -ItemType Directory -Name $clusterName-$dataAtual -Force -Verbose
 
-Start-Sleep -Seconds 3 -Verbose
+Start-Sleep -Seconds 2 -Verbose
 
-Set-Location "$env:SystemDrive\TEMP"
-
-Write-Host "I will copy all the logs to a shared folder now" -ForegroundColor White -BackgroundColor DarkGreen
-
-Move-Item -Path ".\*.log" -Destination \\$SharedPC\$DriveLetter$\$Path\$PCName -Verbose -Force
-Move-Item -Path ".\*.evtx" -Destination \\$SharedPC\$DriveLetter$\$Path\$PCName -Verbose -Force
+Move-Item -Path ".\*.log" -Destination \\$SharedPC\$Path$\$clusterName-$dataAtual -Verbose -Force
+Move-Item -Path ".\*.evtx" -Destination \\$SharedPC\$Path$\$clusterName-$dataAtual -Verbose -Force
 
 
 Write-Output "Fim do Script"
+
+
+}#end of script
+
+[string]$tmpClusterName = Read-Host "Write the Name of Cluster that you want to generate the logs"
+
+Export-MCSCLogEventVwr -clusterName $tmpClusterName
