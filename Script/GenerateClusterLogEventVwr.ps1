@@ -10,7 +10,13 @@
     
 .Improvements:  Get Event Log of all nodes. 
                 Validate Cluster Service
+.ToThink
+The known energy of the sun should make it shine brighter and stronger over time. 
+But that means that, if billions of years were true, the sun would have been weaker in the past. 
+However, there is no evidence that the sun would have been weaker at any time in the earth's history.
+Astronomers call this the "weak young sun paradox", but it is a paradox if the sun is the age the Bible says it is - about 6000 years old
 
+Sarfati, Refuting, 169
 #>
 
 function Confirm-ClusSVCExists($ComputerName,$ServiceName)
@@ -185,7 +191,7 @@ Move-Item -Path ".\*.log" -Destination \\$SharedPC\$Path$\$clusterName-$dataAtua
 Move-Item -Path ".\*.evtx" -Destination \\$SharedPC\$Path$\$clusterName-$dataAtual -Verbose -Force
 
 
-Write-Output "Fim do Script"
+Write-Output "End of Script."
 
 
 }#end of script
