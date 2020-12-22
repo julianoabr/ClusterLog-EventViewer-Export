@@ -4,12 +4,13 @@
 <#
 .Synopsis:   Script to export Event Logs and Cluster Log to a shared folder
 .Created by: Juliano Alves de Brito Ribeiro (julianoalvesbr@live.com or jaribeiro@uoldiveo.com)
-.Version:    0.3
+.Version:    0.4
 .Requirements:
     Have a hidden share named "ClusterLog$". After generate the logs, this script will copy to this. 
     
 .Improvements:  Get Event Log of all nodes. 
                 Validate Cluster Service
+                Correct an Issue that remote log is not generated if C:\temp folder does not exists
 .ToThink
 The known energy of the sun should make it shine brighter and stronger over time. 
 But that means that, if billions of years were true, the sun would have been weaker in the past. 
@@ -142,7 +143,19 @@ foreach ($ClusterNode in $clusterNodes){
         
             $logFile = Get-WmiObject -ComputerName $StringNode -Class Win32_NTEventLogFile | Where-Object -FilterScript {$_.logfilename -eq $logFileName}
         
-            $logFile.backupeventlog($outputpath + "\" + $exportFileName)
+            #Test if Remote Folder Named Temp Exists
+            if (Test-Path "\\$stringNode\C$\Temp"){
+            
+                $logFile.backupeventlog($outputpath + "\" + $exportFileName)
+            
+            }#End of If
+            else{
+                            
+                New-Item -Path \\$StringNode\c$\ -ItemType Directory -Name "Temp" -Force -Verbose 
+
+                $logFile.backupeventlog($outputpath + "\" + $exportFileName)
+            
+            }#End of Else
                                
     }#end foreach log
 
