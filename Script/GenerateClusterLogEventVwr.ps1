@@ -3,7 +3,7 @@
 
 <#
 .Synopsis:   Script to export Event Logs and Cluster Log to a shared folder
-.Created by: Juliano Alves de Brito Ribeiro (julianoalvesbr@live.com or jaribeiro@uoldiveo.com)
+.Created by: Juliano Alves de Brito Ribeiro (julianoalvesbr@live.com)
 .Version:    0.4
 .Requirements:
     Have a hidden share named "ClusterLog$". After generate the logs, this script will copy to this. 
